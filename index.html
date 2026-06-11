@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>引用＆文字数目安 削除ツール</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        textarea { width: 100%; height: 180px; margin-bottom: 10px; font-size: 14px; padding: 10px; box-sizing: border-box; }
+        
+        /* 設定エリアのスタイル */
+        .config-zone { background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #dee2e6; }
+        .config-zone label { display: block; margin-bottom: 8px; cursor: pointer; font-size: 15px; }
+        .config-zone input { margin-right: 8px; transform: scale(1.1); }
+        
+        /* ボタンエリアのスタイル */
+        .btn-group { margin-bottom: 10px; }
+        button { padding: 12px 24px; font-size: 16px; cursor: pointer; color: white; border: none; border-radius: 4px; margin-right: 8px; font-weight: bold; }
+        
+        /* ボタンの色分け */
+        .btn-delete { background-color: #007bff; } /* 青 */
+        .btn-delete:hover { background-color: #0056b3; }
+        .btn-copy { background-color: #28a745; }   /* 緑 */
+        .btn-copy:hover { background-color: #218838; }
+        .btn-clear { background-color: #6c757d; }  /* グレー */
+        .btn-clear:hover { background-color: #5a6268; }
+        
+        .status { font-weight: bold; margin-top: 5px; height: 20px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <h2>引用＆文字数目安 削除ツール</h2>
+    <p>下にテキストを貼り付け、削除したい項目にチェックを入れて「削除する」を押してください。</p>
+    
+    <div class="config-zone">
+        <strong>削除する項目：</strong><br><br>
+        <label><input type="checkbox" id="clearCite" checked> 引用タグ を削除する (例：、［cite：2,3］など)</label>
+        <label><input type="checkbox" id="clearLimit" checked> 文字数の目安 を削除する (例：（目安：100〜150文字）など)</label>
+    </div>
+
+    <textarea id="inputText" placeholder="ここに元のテキストを貼り付けます..."></textarea>
+    
+    <div class="btn-group">
+        <button class="btn-delete" onclick="cleanText()">削除する</button>
+        <button class="btn-copy" onclick="copyText()">結果をコピー</button>
+        <button class="btn-clear" onclick="clearAll()">クリア</button>
+    </div>
+    
+    <div id="statusMessage" class="status"></div>
+    
+    <h3>結果：</h3>
+    <textarea id="outputText" readonly placeholder="結果がここに表示されます"></textarea>
+
+    <script>
+        // 削除処理
+        function cleanText() {
+            const input = document.getElementById('inputText').value;
+            const statusEl = document.getElementById('statusMessage');
+            
+            const doCite = document.getElementById('clearCite').checked;
+            const doLimit = document.getElementById('clearLimit').checked;
+
+            if (!input.trim()) {
+                statusEl.style.color = 'red';
+                statusEl.innerText = '【エラー】テキストが入力されていません。';
+                return;
+            }
+
+            if (!doCite && !doLimit) {
+                statusEl.style.color = 'orange';
+                statusEl.innerText = '【案内】削除する項目に少なくとも1つチェックを入れてください。';
+                return;
+            }
+
+            try {
+                let cleaned = input;
+
+                // 1. 引用タグの削除
+                if (doCite) {
+                    const regexCite = /[\[［][cC][iI][tT][eE][:：\s].*?[\]］]/g;
+                    cleaned = cleaned.replace(regexCite, '');
+                }
+
+                // 2. 文字数目安の削除
+                if (doLimit) {
+                    const regexLimit = /[（\(]目安[:：\s]*\d+(?:[〜~\-ー]\d+)?文字[）\)]/g;
+                    cleaned = cleaned.replace(regexLimit, '');
+                }
+                
+                document.getElementById('outputText').value = cleaned;
+                
+                statusEl.style.color = 'green';
+                statusEl.innerText = '【成功】指定された項目の削除処理が完了しました！';
+            } catch (error) {
+                statusEl.style.color = 'red';
+                statusEl.innerText = '【エラー】処理中に不具合が発生しました: ' + error.message;
+            }
+            
+            setTimeout(() => { statusEl.innerText = ''; }, 4000);
+        }
+
+        // コピー処理
+        function copyText() {
+            const outputText = document.getElementById('outputText').value;
+            const statusEl = document.getElementById('statusMessage');
+
+            if (!outputText.trim()) {
+                statusEl.style.color = 'orange';
+                statusEl.innerText = '【案内】コピーする結果テキストがありません。先に「削除する」を押してください。';
+                return;
+            }
+
+            // クリップボードにコピー
+            navigator.clipboard.writeText(outputText).then(() => {
+                statusEl.style.color = '#28a745';
+                statusEl.innerText = '【成功】結果をクリップボードにコピーしました！';
+            }).catch(error => {
+                statusEl.style.color = 'red';
+                statusEl.innerText = '【エラー】コピーに失敗しました。お使いのブラウザの設定を確認してください。';
+            });
+
+            setTimeout(() => { statusEl.innerText = ''; }, 4000);
+        }
+
+        // クリア処理
+        function clearAll() {
+            document.getElementById('inputText').value = '';
+            document.getElementById('outputText').value = '';
+            
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.style.color = '#6c757d';
+            statusEl.innerText = '入力と結果をクリアしました。';
+            
+            setTimeout(() => { statusEl.innerText = ''; }, 3000);
+        }
+    </script>
+</body>
+</html>
