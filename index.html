@@ -2,135 +2,401 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>引用＆文字数目安 削除ツール</title>
+    <title>テキスト整形ツール（個別ファイル対応）</title>
     <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        textarea { width: 100%; height: 180px; margin-bottom: 10px; font-size: 14px; padding: 10px; box-sizing: border-box; }
+        body { font-family: sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; color: #333; }
         
-        /* 設定エリアのスタイル */
+        /* ドラッグ＆ドロップエリア */
+        .drop-zone {
+            border: 2px dashed #adb5bd;
+            border-radius: 6px;
+            padding: 40px 10px;
+            text-align: center;
+            background-color: #f8f9fa;
+            transition: background-color 0.2s, border-color 0.2s;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+        .drop-zone.dragover {
+            background-color: #e2e6ea;
+            border-color: #007bff;
+        }
+        .drop-zone:hover {
+            background-color: #e2e6ea;
+        }
+
+        /* 設定エリア */
         .config-zone { background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #dee2e6; }
         .config-zone label { display: block; margin-bottom: 8px; cursor: pointer; font-size: 15px; }
         .config-zone input { margin-right: 8px; transform: scale(1.1); }
         
-        /* ボタンエリアのスタイル */
-        .btn-group { margin-bottom: 10px; }
-        button { padding: 12px 24px; font-size: 16px; cursor: pointer; color: white; border: none; border-radius: 4px; margin-right: 8px; font-weight: bold; }
+        /* ボタンエリア */
+        .btn-group { margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+        button { padding: 10px 20px; font-size: 15px; cursor: pointer; color: white; border: none; border-radius: 4px; font-weight: bold; transition: opacity 0.2s; }
+        button:hover { opacity: 0.8; }
         
-        /* ボタンの色分け */
+        /* 全体操作ボタンの色 */
         .btn-delete { background-color: #007bff; } /* 青 */
-        .btn-delete:hover { background-color: #0056b3; }
-        .btn-copy { background-color: #28a745; }   /* 緑 */
-        .btn-copy:hover { background-color: #218838; }
-        .btn-clear { background-color: #6c757d; }  /* グレー */
-        .btn-clear:hover { background-color: #5a6268; }
+        .btn-copy   { background-color: #28a745; } /* 緑 */
+        .btn-download { background-color: #6f42c1; } /* 紫 */
+        .btn-clear  { background-color: #6c757d; } /* グレー */
+        .btn-add    { background-color: #17a2b8; } /* 青緑 */
         
-        .status { font-weight: bold; margin-top: 5px; height: 20px; font-size: 14px; }
+        .status { font-weight: bold; margin-top: 5px; height: 20px; font-size: 14px; margin-bottom: 10px; }
+
+        /* --- ファイルごとの個別ユニット（ブロック） --- */
+        .file-unit {
+            background-color: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .file-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .filename-input {
+            font-size: 15px;
+            padding: 6px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            width: 50%;
+            font-weight: bold;
+        }
+        .unit-controls button {
+            padding: 6px 12px;
+            font-size: 13px;
+            margin-left: 5px;
+        }
+        .btn-unit-copy { background-color: #28a745; }
+        .btn-unit-remove { background-color: #dc3545; }
+
+        .textarea-group {
+            display: flex;
+            gap: 15px;
+        }
+        .area-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .area-label {
+            font-size: 13px;
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 5px;
+        }
+        .textarea-group textarea {
+            width: 100%;
+            height: 140px;
+            resize: vertical;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .outputText {
+            background-color: #f8f9fa;
+        }
+
+        /* スマホ向けの縦並び設定 */
+        @media (max-width: 600px) {
+            .textarea-group { flex-direction: column; }
+            .filename-input { width: 100%; margin-bottom: 10px; }
+            .file-header { flex-direction: column; align-items: flex-start; }
+        }
     </style>
 </head>
 <body>
-    <h2>引用＆文字数目安 削除ツール</h2>
-    <p>下にテキストを貼り付け、削除したい項目にチェックを入れて「削除する」を押してください。</p>
+    <h2>テキスト整形ツール（個別ファイル対応）</h2>
     
+    <!-- 隠しファイル入力 -->
+    <input type="file" id="fileInput" accept=".txt,text/plain" style="display: none;" multiple>
+    
+    <!-- クリック＆ドラッグドロップエリア -->
+    <div id="dropZone" class="drop-zone" onclick="document.getElementById('fileInput').click()">
+        <p style="margin: 0; font-size: 16px; color: #495057;">📁 ここをクリックするか、TXTファイルをドラッグ＆ドロップ（複数可）</p>
+    </div>
+
+    <!-- 設定エリア -->
     <div class="config-zone">
         <strong>削除する項目：</strong><br><br>
-        <label><input type="checkbox" id="clearCite" checked> 引用タグ を削除する (例：、［cite：2,3］など)</label>
+        <label><input type="checkbox" id="clearCite" checked> 引用タグ を削除する (例：［cite：2,3］など)</label>
         <label><input type="checkbox" id="clearLimit" checked> 文字数の目安 を削除する (例：（目安：100〜150文字）など)</label>
     </div>
 
-    <textarea id="inputText" placeholder="ここに元のテキストを貼り付けます..."></textarea>
-    
+    <!-- 全体操作ボタンエリア -->
     <div class="btn-group">
-        <button class="btn-delete" onclick="cleanText()">削除する</button>
-        <button class="btn-copy" onclick="copyText()">結果をコピー</button>
-        <button class="btn-clear" onclick="clearAll()">クリア</button>
+        <button class="btn-delete" onclick="cleanAll()">✨ すべて整形する</button>
+        <button class="btn-download" onclick="downloadAll()">📥 すべてダウンロード</button>
+        <button class="btn-copy" onclick="copyAll()">📋 すべて結合してコピー</button>
+        <button class="btn-add" onclick="addEmptyUnit()">＋ 新規テキスト追加</button>
+        <button class="btn-clear" onclick="clearAll()">🗑️ すべてクリア</button>
     </div>
     
     <div id="statusMessage" class="status"></div>
     
-    <h3>結果：</h3>
-    <textarea id="outputText" readonly placeholder="結果がここに表示されます"></textarea>
+    <!-- ファイルごとのユニットが追加される場所 -->
+    <div id="fileContainer"></div>
 
     <script>
-        // 削除処理
-        function cleanText() {
-            const input = document.getElementById('inputText').value;
-            const statusEl = document.getElementById('statusMessage');
-            
-            const doCite = document.getElementById('clearCite').checked;
-            const doLimit = document.getElementById('clearLimit').checked;
+        let statusTimer;
 
-            if (!input.trim()) {
-                statusEl.style.color = 'red';
-                statusEl.innerText = '【エラー】テキストが入力されていません。';
+        // ページ読み込み時に空のユニットを1つ追加
+        window.onload = () => {
+            addEmptyUnit();
+        };
+
+        // メッセージ表示用関数
+        function showStatus(message, color) {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.style.color = color;
+            statusEl.innerText = message;
+            
+            if(statusTimer) clearTimeout(statusTimer);
+            statusTimer = setTimeout(() => { statusEl.innerText = ''; }, 4000);
+        }
+
+        // --- UI生成関連 ---
+
+        function createFileUnit(filename, content) {
+            const unit = document.createElement('div');
+            unit.className = 'file-unit';
+            
+            // HTMLの枠組み
+            unit.innerHTML = `
+                <div class="file-header">
+                    <input type="text" class="filename-input" placeholder="ファイル名">
+                    <div class="unit-controls">
+                        <button class="btn-unit-copy" onclick="copyUnit(this)">📋 コピー</button>
+                        <button class="btn-unit-remove" onclick="removeUnit(this)">✕ 削除</button>
+                    </div>
+                </div>
+                <div class="textarea-group">
+                    <div class="area-wrapper">
+                        <div class="area-label">元のテキスト</div>
+                        <textarea class="inputText" placeholder="ここにテキストを入力・貼り付け"></textarea>
+                    </div>
+                    <div class="area-wrapper">
+                        <div class="area-label">整形結果</div>
+                        <textarea class="outputText" readonly placeholder="結果がここに表示されます"></textarea>
+                    </div>
+                </div>
+            `;
+
+            // 値のセット（XSS対策としてプロパティに直接代入）
+            unit.querySelector('.filename-input').value = filename;
+            unit.querySelector('.inputText').value = content;
+
+            return unit;
+        }
+
+        function addEmptyUnit() {
+            const container = document.getElementById('fileContainer');
+            const unitCount = container.querySelectorAll('.file-unit').length + 1;
+            const unit = createFileUnit(`新規テキスト${unitCount}.txt`, '');
+            container.insertBefore(unit, container.firstChild); // 一番上に追加
+        }
+
+        function removeUnit(btn) {
+            btn.closest('.file-unit').remove();
+        }
+
+        // --- ファイル読み込み・ドラッグ＆ドロップ関連 ---
+        
+        function readFileAsync(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.onerror = e => reject(e);
+                reader.readAsText(file, 'UTF-8');
+            });
+        }
+
+        async function handleFiles(files) {
+            if (!files || files.length === 0) return;
+            
+            const validFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.txt'));
+            if (validFiles.length === 0) {
+                showStatus('【エラー】テキストファイル(.txt)を選択してください。', 'red');
                 return;
             }
 
-            if (!doCite && !doLimit) {
-                statusEl.style.color = 'orange';
-                statusEl.innerText = '【案内】削除する項目に少なくとも1つチェックを入れてください。';
-                return;
+            const container = document.getElementById('fileContainer');
+            
+            // 初期状態の空ユニット（入力なし）があれば削除して整理
+            const currentUnits = container.querySelectorAll('.file-unit');
+            if (currentUnits.length === 1 && currentUnits[0].querySelector('.inputText').value.trim() === '') {
+                currentUnits[0].remove();
             }
 
             try {
-                let cleaned = input;
-
-                // 1. 引用タグの削除
-                if (doCite) {
-                    const regexCite = /[\[［][cC][iI][tT][eE][:：\s].*?[\]］]/g;
-                    cleaned = cleaned.replace(regexCite, '');
+                // ファイルごとにユニットを作成して追加
+                for (const file of validFiles) {
+                    const text = await readFileAsync(file);
+                    const unit = createFileUnit(file.name, text);
+                    container.appendChild(unit);
                 }
-
-                // 2. 文字数目安の削除
-                if (doLimit) {
-                    const regexLimit = /[（\(]目安[:：\s]*\d+(?:[〜~\-ー]\d+)?文字[）\)]/g;
-                    cleaned = cleaned.replace(regexLimit, '');
-                }
-                
-                document.getElementById('outputText').value = cleaned;
-                
-                statusEl.style.color = 'green';
-                statusEl.innerText = '【成功】指定された項目の削除処理が完了しました！';
+                showStatus(`【成功】${validFiles.length}件のファイルを読み込みました！`, 'green');
             } catch (error) {
-                statusEl.style.color = 'red';
-                statusEl.innerText = '【エラー】処理中に不具合が発生しました: ' + error.message;
+                showStatus('【エラー】ファイルの読み込みに失敗しました。', 'red');
             }
-            
-            setTimeout(() => { statusEl.innerText = ''; }, 4000);
         }
 
-        // コピー処理
-        function copyText() {
-            const outputText = document.getElementById('outputText').value;
-            const statusEl = document.getElementById('statusMessage');
+        // クリックでファイル選択
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            handleFiles(e.target.files);
+            this.value = '';
+        });
 
-            if (!outputText.trim()) {
-                statusEl.style.color = 'orange';
-                statusEl.innerText = '【案内】コピーする結果テキストがありません。先に「削除する」を押してください。';
+        // ドラッグ＆ドロップ
+        const dropZone = document.getElementById('dropZone');
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        // --- 整形・操作機能関連 ---
+
+        function cleanAll() {
+            const doCite = document.getElementById('clearCite').checked;
+            const doLimit = document.getElementById('clearLimit').checked;
+            const units = document.querySelectorAll('.file-unit');
+
+            if (units.length === 0) {
+                showStatus('【エラー】処理するファイルがありません。', 'red');
+                return;
+            }
+            if (!doCite && !doLimit) {
+                showStatus('【案内】削除する項目にチェックを入れてください。', 'orange');
                 return;
             }
 
-            // クリップボードにコピー
-            navigator.clipboard.writeText(outputText).then(() => {
-                statusEl.style.color = '#28a745';
-                statusEl.innerText = '【成功】結果をクリップボードにコピーしました！';
-            }).catch(error => {
-                statusEl.style.color = 'red';
-                statusEl.innerText = '【エラー】コピーに失敗しました。お使いのブラウザの設定を確認してください。';
+            let successCount = 0;
+
+            units.forEach(unit => {
+                const inputVal = unit.querySelector('.inputText').value;
+                if (!inputVal.trim()) return; // 空の場合はスキップ
+
+                let cleaned = inputVal;
+
+                // 1. 引用タグの削除
+                if (doCite) {
+                    cleaned = cleaned.replace(/[\[［][cC][iI][tT][eE][:：\s].*?[\]］]/g, '');
+                }
+                // 2. 文字数目安の削除
+                if (doLimit) {
+                    cleaned = cleaned.replace(/[（\(]目安[:：\s]*\d+(?:[〜~\-ー]\d+)?文字[）\)]/g, '');
+                }
+                
+                unit.querySelector('.outputText').value = cleaned;
+                successCount++;
             });
 
-            setTimeout(() => { statusEl.innerText = ''; }, 4000);
+            if (successCount > 0) {
+                showStatus(`【成功】${successCount}件のテキストを整形しました！`, 'green');
+            } else {
+                showStatus('【案内】処理するテキストが入力されていません。', 'orange');
+            }
         }
 
-        // クリア処理
+        function downloadAll() {
+            const units = document.querySelectorAll('.file-unit');
+            let downloadCount = 0;
+
+            units.forEach(unit => {
+                const outputText = unit.querySelector('.outputText').value;
+                if (!outputText.trim()) return;
+
+                // ダウンロード用ファイル名の生成
+                let filename = unit.querySelector('.filename-input').value.trim() || '無題のテキスト';
+                if (filename.toLowerCase().endsWith('.txt')) {
+                    filename = filename.replace(/\.txt$/i, '_整形済.txt');
+                } else {
+                    filename += '_整形済.txt';
+                }
+
+                // 個別ファイルのダウンロード実行
+                const blob = new Blob([outputText], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                downloadCount++;
+            });
+
+            if (downloadCount > 0) {
+                showStatus(`【成功】${downloadCount}件のファイルを個別にダウンロードしました！`, '#6f42c1');
+            } else {
+                showStatus('【案内】ダウンロードする結果がありません。先に「整形する」を押してください。', 'orange');
+            }
+        }
+
+        // 個別ユニットのコピー
+        function copyUnit(btn) {
+            const outputText = btn.closest('.file-unit').querySelector('.outputText');
+            if (!outputText.value.trim()) {
+                showStatus('【案内】コピーする結果がありません。', 'orange');
+                return;
+            }
+            outputText.select();
+            outputText.setSelectionRange(0, 99999);
+            try {
+                document.execCommand('copy');
+                showStatus('【成功】結果をコピーしました！', '#28a745');
+            } catch (err) {
+                showStatus('【エラー】コピーに失敗しました。', 'red');
+            }
+            window.getSelection().removeAllRanges();
+        }
+
+        // すべて結合してコピー
+        function copyAll() {
+            const units = document.querySelectorAll('.file-unit');
+            let combined = [];
+            units.forEach(unit => {
+                const txt = unit.querySelector('.outputText').value.trim();
+                if(txt) combined.push(txt);
+            });
+
+            if (combined.length === 0) {
+                showStatus('【案内】コピーする結果テキストがありません。', 'orange');
+                return;
+            }
+
+            const tempTextArea = document.createElement('textarea');
+            // ファイルの区切りとして改行を入れる
+            tempTextArea.value = combined.join('\n\n\n');
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            try {
+                document.execCommand('copy');
+                showStatus('【成功】すべての結果を結合してコピーしました！', '#28a745');
+            } catch (err) {
+                showStatus('【エラー】コピーに失敗しました。', 'red');
+            }
+            document.body.removeChild(tempTextArea);
+        }
+
         function clearAll() {
-            document.getElementById('inputText').value = '';
-            document.getElementById('outputText').value = '';
-            
-            const statusEl = document.getElementById('statusMessage');
-            statusEl.style.color = '#6c757d';
-            statusEl.innerText = '入力と結果をクリアしました。';
-            
-            setTimeout(() => { statusEl.innerText = ''; }, 3000);
+            document.getElementById('fileContainer').innerHTML = '';
+            document.getElementById('fileInput').value = '';
+            addEmptyUnit(); // 初期状態に戻す
+            showStatus('すべての入力と結果をクリアしました。', '#6c757d');
         }
     </script>
 </body>
